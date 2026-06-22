@@ -1,0 +1,132 @@
+---
+name: Management
+
+"on":
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/management.yml
+      - environments/canary/management.bicepparam
+      - environments/prod/management.bicepparam
+      - modules/management/**
+      - "!README.md"
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/management.yml
+      - environments/canary/management.bicepparam
+      - environments/prod/management.bicepparam
+      - modules/management/**
+      - "!README.md"
+
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  canary:
+    name: Canary
+    runs-on: ubuntu-latest
+    environment:
+      name: Canary
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Login to Azure
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Validate Deployment
+        uses: azure/arm-deploy@a1361c2c2cd398621955b16ca32e01c65ea340f5 # v2.0.0
+        with:
+          deploymentName: management-canary-${{ github.run_id }}-${{ github.job }}
+          scope: managementgroup
+          managementGroupId: ${{ vars.MANAGEMENT_GROUP_ID }}
+          region: ${{ vars.LOCATION }}
+          template: modules/management/main.bicep
+          parameters: environments/canary/management.bicepparam
+          deploymentMode: Validate
+      - name: What-if Deployment
+        uses: azure/arm-deploy@a1361c2c2cd398621955b16ca32e01c65ea340f5 # v2.0.0
+        with:
+          deploymentName: management-canary-${{ github.run_id }}-${{ github.job }}
+          scope: managementgroup
+          managementGroupId: ${{ vars.MANAGEMENT_GROUP_ID }}
+          region: ${{ vars.LOCATION }}
+          template: modules/management/main.bicep
+          parameters: environments/canary/management.bicepparam
+          additionalArguments: --what-if
+      - name: Deploy Resources
+        uses: azure/arm-deploy@a1361c2c2cd398621955b16ca32e01c65ea340f5 # v2.0.0
+        if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'pull_request' }}
+        with:
+          deploymentName: management-canary-${{ github.run_id }}-${{ github.job }}
+          scope: managementgroup
+          managementGroupId: ${{ vars.MANAGEMENT_GROUP_ID }}
+          region: ${{ vars.LOCATION }}
+          template: modules/management/main.bicep
+          parameters: environments/canary/management.bicepparam
+
+  prod:
+    name: Production
+    runs-on: ubuntu-latest
+    environment:
+      name: Production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+      - name: Login to Azure
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Validate Deployment
+        uses: azure/arm-deploy@a1361c2c2cd398621955b16ca32e01c65ea340f5 # v2.0.0
+        with:
+          deploymentName: management-production-${{ github.run_id }}-${{ github.job }}
+          scope: managementgroup
+          managementGroupId: ${{ vars.MANAGEMENT_GROUP_ID }}
+          region: ${{ vars.LOCATION }}
+          template: modules/management/main.bicep
+          parameters: environments/prod/management.bicepparam
+          deploymentMode: Validate
+      - name: What-if Deployment
+        uses: azure/arm-deploy@a1361c2c2cd398621955b16ca32e01c65ea340f5 # v2.0.0
+        with:
+          deploymentName: management-production-${{ github.run_id }}-${{ github.job }}
+          scope: managementgroup
+          managementGroupId: ${{ vars.MANAGEMENT_GROUP_ID }}
+          region: ${{ vars.LOCATION }}
+          template: modules/management/main.bicep
+          parameters: environments/prod/management.bicepparam
+          additionalArguments: --what-if
+      - name: Deploy Resources
+        uses: azure/arm-deploy@a1361c2c2cd398621955b16ca32e01c65ea340f5 # v2.0.0
+        if: github.ref == 'refs/heads/main'
+        with:
+          deploymentName: management-production-${{ github.run_id }}-${{ github.job }}
+          scope: managementgroup
+          managementGroupId: ${{ vars.MANAGEMENT_GROUP_ID }}
+          region: ${{ vars.LOCATION }}
+          template: modules/management/main.bicep
+          parameters: environments/prod/management.bicepparam

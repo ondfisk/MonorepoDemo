@@ -1,0 +1,6 @@
+main.bicep
+main.bicepparam
+main.*.bicep
+main.*.bicepparam
+main.json
+main.*.json
